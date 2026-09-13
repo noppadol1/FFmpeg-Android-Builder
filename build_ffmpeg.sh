@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# 1. ตั้งค่าตัวแปรเบื้องต้น
+# 1. ตั้งค่าตัวแปร
 FFMPEG_VERSION="7.0"
-NDK_PATH=$ANDROID_NDK_LATEST_HOME # GitHub Actions มี NDK ให้อยู่แล้ว
+NDK_PATH=$ANDROID_NDK_LATEST_HOME
 TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
 API_LEVEL=21
 
-# ดาวน์โหลด FFmpeg Source Code
+# ดาวน์โหลด FFmpeg
 wget https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
 tar xjvf ffmpeg-$FFMPEG_VERSION.tar.bz2
 cd ffmpeg-$FFMPEG_VERSION
@@ -47,18 +47,24 @@ function build_ffmpeg {
         --enable-hwaccels \
         --enable-gpl \
         --disable-everything \
-        --enable-decoder=h264,aac,mp3,mpeg4 \
-        --enable-encoder=aac,mpeg4 \
+        --enable-decoder=h264,aac,mp3,mpeg4,mjpeg,png \
+        --enable-encoder=aac,mpeg4,mjpeg,png \
         --enable-parser=h264,aac,mpegaudio \
-        --enable-demuxer=mov,mp4,m4a,mp3,wav,avi,matroska \
-        --enable-muxer=mp4,mov,mp3,wav \
+        --enable-demuxer=mov,mp4,m4a,mp3,wav,avi,matroska,image2,mjpeg,png \
+        --enable-muxer=mp4,mov,mp3,wav,ipod,image2 \
         --enable-protocol=file \
-        --enable-filter=trim,atrim,amix,volume,aresample,scale
+        --enable-filter=trim,atrim,amix,volume,aresample,scale,fps,format,anull,aformat
 
     make clean
     make -j$(nproc)
     make install
 }
+
+# รันการ Build
+build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
+build_ffmpeg "armeabi-v7a" "arm" "armv7a-linux-androideabi"
+
+echo "Build Completed!"
 
 # รันการ Build สำหรับสถาปัตยกรรมต่างๆ
 build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
