@@ -1,7 +1,7 @@
 name: Build FFmpeg for Android
 
 on:
-  workflow_dispatch: # กดรันเองได้จากเว็บ GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -11,14 +11,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config yasm
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config yasm wget bzip2
 
       - name: Run Build Script
         run: |
@@ -28,5 +22,5 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-android-libs
+          name: ffmpeg-android-libs-v2
           path: ffmpeg-*/android/
