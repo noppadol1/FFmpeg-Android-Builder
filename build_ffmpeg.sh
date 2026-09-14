@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # หยุดทันทีถ้ามีคำสั่งไหนพัง
+set -e # หยุดทันทีถ้าพัง
 
 FFMPEG_VERSION="7.0"
 LAME_VERSION="3.100"
@@ -29,13 +29,17 @@ function build_all {
     echo "--- Building for $ABI ---"
     mkdir -p $OUTPUT_PATH
 
-    # 1. Build LAME
+    # 1. Build LAME (Fixing Android Linker Error)
     cd $WORKING_DIR/lame-$LAME_VERSION
+    # แก้บั๊กสัญลักษณ์ 'lame_init_old' ที่ Linker รุ่นใหม่หาไม่เจอ
+    sed -i 's/lame_init_old//g' include/libmp3lame.sym
+
     ./configure \
         --host=$HOST \
         --prefix=$OUTPUT_PATH \
         --disable-static \
         --enable-shared \
+        --disable-frontend \
         CC=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
         AR=$TOOLCHAIN/bin/llvm-ar \
         RANLIB=$TOOLCHAIN/bin/llvm-ranlib
@@ -87,7 +91,8 @@ function build_all {
     make clean && make -j$(nproc) && make install
 }
 
+# รันสำหรับแต่ละ ABI
 build_all "arm64-v8a" "aarch64" "aarch64-linux-android" "aarch64-linux-android"
 build_all "armeabi-v7a" "arm" "arm-linux-androideabi" "armv7a-linux-androideabi"
 
-echo "ALL STEPS COMPLETED SUCCESSFULLY!"
+echo "CONGRATULATIONS! ALL LIBRARIES BUILT SUCCESSFULLY."
