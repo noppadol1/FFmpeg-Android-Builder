@@ -1,19 +1,15 @@
 #!/bin/bash
 
-# 1. ตั้งค่าตัวแปร
 FFMPEG_VERSION="7.0"
 LAME_VERSION="3.100"
-X264_VERSION="master"
 NDK_PATH=$ANDROID_NDK_LATEST_HOME
 TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
 API_LEVEL=21
 
-# สร้างโฟลเดอร์สำหรับทำงาน
 mkdir -p build && cd build
 WORKING_DIR=$(pwd)
 
-# ดาวน์โหลด Sources
-echo "Downloading sources..."
+# Download sources
 wget -q https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
 wget -q -O lame.tar.gz https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
 git clone --depth 1 https://code.videolan.org/videolan/x264.git
@@ -21,15 +17,16 @@ git clone --depth 1 https://code.videolan.org/videolan/x264.git
 tar xjf ffmpeg-$FFMPEG_VERSION.tar.bz2
 tar xzf lame.tar.gz
 
-function build_all {
+function build_one {
     ABI=$1
     ARCH=$2
     CROSS_PREFIX=$3
     OUTPUT_PATH=$WORKING_DIR/output/$ABI
 
-    echo "--- Building for $ABI ---"
+    echo "--- Building $ABI ---"
+    mkdir -p $OUTPUT_PATH
 
-    # A. Build LAME (MP3 Encoder)
+    # 1. Build LAME
     cd $WORKING_DIR/lame-$LAME_VERSION
     ./configure \
         --host=$CROSS_PREFIX \
@@ -40,7 +37,7 @@ function build_all {
         CFLAGS="-fPIC"
     make clean && make -j$(nproc) && make install
 
-    # B. Build x264 (Video Encoder)
+    # 2. Build x264
     cd $WORKING_DIR/x264
     ./configure \
         --host=$CROSS_PREFIX \
@@ -52,7 +49,7 @@ function build_all {
         --extra-cflags="-fPIC"
     make clean && make -j$(nproc) && make install
 
-    # C. Build FFmpeg (Linking LAME and x264)
+    # 3. Build FFmpeg
     cd $WORKING_DIR/ffmpeg-$FFMPEG_VERSION
     ./configure \
         --prefix=$OUTPUT_PATH \
@@ -61,14 +58,16 @@ function build_all {
         --enable-pic \
         --disable-doc \
         --disable-ffmpeg \
-        --cross-prefix=$CROSS_PREFIX \
+        --cross-prefix=$TOOLCHAIN/bin/$CROSS_PREFIX$API_LEVEL- \
         --target-os=android \
         --arch=$ARCH \
         --enable-cross-compile \
         --sysroot=$TOOLCHAIN/sysroot \
+        --cc=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
+        --nm=$TOOLCHAIN/bin/llvm-nm \
+        --ar=$TOOLCHAIN/bin/llvm-ar \
         --extra-cflags="-I$OUTPUT_PATH/include" \
         --extra-ldflags="-L$OUTPUT_PATH/lib" \
-        --cc=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
         --enable-gpl \
         --enable-libmp3lame \
         --enable-libx264 \
@@ -84,12 +83,7 @@ function build_all {
     make clean && make -j$(nproc) && make install
 }
 
-build_all "arm64-v8a" "aarch64" "aarch64-linux-android"
-build_all "armeabi-v7a" "arm" "armv7a-linux-androideabi"
+build_one "arm64-v8a" "aarch64" "aarch64-linux-android"
+build_one "armeabi-v7a" "arm" "armv7a-linux-androideabi"
 
-echo "Build Completed! All files are in $WORKING_DIR/output"
-
-build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
-build_ffmpeg "armeabi-v7a" "arm" "armv7a-linux-androideabi"
-
-echo "Build Completed! Files are in $(pwd)/android"
+echo "ALL DONE!"
