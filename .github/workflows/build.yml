@@ -7,10 +7,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Get Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Prep Tools
+      - name: Install Tools
         run: sudo apt-get update && sudo apt-get install -y build-essential yasm wget git nasm
 
       - name: Run Main Build
@@ -19,8 +19,8 @@ jobs:
           ./build_ffmpeg.sh
 
       - name: Upload Artifacts
-        if: success() # จะอัปโหลดเฉพาะตอนที่คอมไพล์สำเร็จจริงเท่านั้น
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-ultimate-v3
+          name: ffmpeg-ultimate-v4
           path: build/output/
