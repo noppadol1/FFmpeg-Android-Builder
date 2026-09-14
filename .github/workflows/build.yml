@@ -24,8 +24,5 @@ jobs:
         with:
           name: ffmpeg-ultimate-libs
           path: build/output/
-
-        uses: actions/upload-artifact@v4
-        with:
           name: ffmpeg-android-libs-v2
           path: ffmpeg-*/android/
