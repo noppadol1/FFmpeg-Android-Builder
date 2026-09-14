@@ -2,23 +2,58 @@
 
 # 1. ตั้งค่าตัวแปร
 FFMPEG_VERSION="7.0"
+LAME_VERSION="3.100"
+X264_VERSION="master"
 NDK_PATH=$ANDROID_NDK_LATEST_HOME
 TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
 API_LEVEL=21
 
-# ดาวน์โหลด FFmpeg
-wget https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
-tar xjvf ffmpeg-$FFMPEG_VERSION.tar.bz2
-cd ffmpeg-$FFMPEG_VERSION
+# สร้างโฟลเดอร์สำหรับทำงาน
+mkdir -p build && cd build
+WORKING_DIR=$(pwd)
 
-function build_ffmpeg {
+# ดาวน์โหลด Sources
+echo "Downloading sources..."
+wget -q https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
+wget -q -O lame.tar.gz https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
+git clone --depth 1 https://code.videolan.org/videolan/x264.git
+
+tar xjf ffmpeg-$FFMPEG_VERSION.tar.bz2
+tar xzf lame.tar.gz
+
+function build_all {
     ABI=$1
     ARCH=$2
     CROSS_PREFIX=$3
-    OUTPUT_PATH=$(pwd)/android/$ABI
+    OUTPUT_PATH=$WORKING_DIR/output/$ABI
 
-    echo "Building for $ABI..."
+    echo "--- Building for $ABI ---"
 
+    # A. Build LAME (MP3 Encoder)
+    cd $WORKING_DIR/lame-$LAME_VERSION
+    ./configure \
+        --host=$CROSS_PREFIX \
+        --prefix=$OUTPUT_PATH \
+        --disable-static \
+        --enable-shared \
+        CC=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
+        CFLAGS="-fPIC"
+    make clean && make -j$(nproc) && make install
+
+    # B. Build x264 (Video Encoder)
+    cd $WORKING_DIR/x264
+    ./configure \
+        --host=$CROSS_PREFIX \
+        --prefix=$OUTPUT_PATH \
+        --enable-shared \
+        --disable-cli \
+        --cross-prefix=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}- \
+        --sysroot=$TOOLCHAIN/sysroot \
+        --extra-cflags="-fPIC"
+    make clean && make -j$(nproc) && make install
+
+    # C. Build FFmpeg (Linking LAME and x264)
+    cd $WORKING_DIR/ffmpeg-$FFMPEG_VERSION
     ./configure \
         --prefix=$OUTPUT_PATH \
         --enable-shared \
@@ -26,47 +61,34 @@ function build_ffmpeg {
         --enable-pic \
         --disable-doc \
         --disable-ffmpeg \
-        --disable-ffplay \
-        --disable-ffprobe \
-        --disable-avdevice \
-        --disable-symver \
         --cross-prefix=$CROSS_PREFIX \
         --target-os=android \
         --arch=$ARCH \
         --enable-cross-compile \
         --sysroot=$TOOLCHAIN/sysroot \
-        --extra-cflags="-Os -fpic" \
+        --extra-cflags="-I$OUTPUT_PATH/include" \
+        --extra-ldflags="-L$OUTPUT_PATH/lib" \
         --cc=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
-        --cxx=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang++ \
-        --nm=$TOOLCHAIN/bin/llvm-nm \
-        --ar=$TOOLCHAIN/bin/llvm-ar \
-        --as=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
-        --strip=$TOOLCHAIN/bin/llvm-strip \
-        --ranlib=$TOOLCHAIN/bin/llvm-ranlib \
-        --enable-neon \
-        --enable-hwaccels \
         --enable-gpl \
+        --enable-libmp3lame \
+        --enable-libx264 \
         --disable-everything \
         --enable-decoder=h264,aac,mp3,mpeg4,mjpeg,png \
-        --enable-encoder=aac,mpeg4,mjpeg,png \
+        --enable-encoder=aac,mpeg4,libmp3lame,libx264,mjpeg,png \
         --enable-parser=h264,aac,mpegaudio \
         --enable-demuxer=mov,mp4,m4a,mp3,wav,avi,matroska,image2,mjpeg,png \
         --enable-muxer=mp4,mov,mp3,wav,ipod,image2 \
         --enable-protocol=file \
         --enable-filter=trim,atrim,amix,volume,aresample,scale,fps,format,anull,aformat
 
-    make clean
-    make -j$(nproc)
-    make install
+    make clean && make -j$(nproc) && make install
 }
 
-# รันการ Build
-build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
-build_ffmpeg "armeabi-v7a" "arm" "armv7a-linux-androideabi"
+build_all "arm64-v8a" "aarch64" "aarch64-linux-android"
+build_all "armeabi-v7a" "arm" "armv7a-linux-androideabi"
 
-echo "Build Completed!"
+echo "Build Completed! All files are in $WORKING_DIR/output"
 
-# รันการ Build สำหรับสถาปัตยกรรมต่างๆ
 build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
 build_ffmpeg "armeabi-v7a" "arm" "armv7a-linux-androideabi"
 
