@@ -19,7 +19,7 @@ git clone --depth 1 https://code.videolan.org/videolan/x264.git
 tar xjf ffmpeg-$FFMPEG_VERSION.tar.bz2
 tar xzf lame.tar.gz
 
-function build_all {
+function build_one {
     ABI=$1
     ARCH=$2
     HOST=$3
@@ -29,10 +29,13 @@ function build_all {
     echo "--- Building for $ABI ---"
     mkdir -p $OUTPUT_PATH
 
-    # 1. Build LAME (Fixing Android Linker Issues)
+    # 1. Build LAME (Force Cleaning and Fix Android Linker)
     cd $WORKING_DIR/lame-$LAME_VERSION
-    # ลบบรรทัดที่มีสัญลักษณ์เจ้าปัญหาออกทั้งบรรทัด และล้างตัวอักษรแปลกปลอม
+    # ล้างตัวอักษร \r (Carriage Return) ออกให้หมด และลบบรรทัดที่มีปัญหา
+    tr -d '\r' < include/libmp3lame.sym > include/libmp3lame.sym.tmp
+    mv include/libmp3lame.sym.tmp include/libmp3lame.sym
     sed -i '/lame_init_old/d' include/libmp3lame.sym
+    sed -i '/^$/d' include/libmp3lame.sym
 
     ./configure \
         --host=$HOST \
@@ -50,6 +53,7 @@ function build_all {
     ./configure \
         --host=$HOST \
         --prefix=$OUTPUT_PATH \
+        --bindir=$OUTPUT_PATH/bin \
         --enable-shared \
         --disable-cli \
         --cross-prefix=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}- \
@@ -91,7 +95,8 @@ function build_all {
     make clean && make -j$(nproc) && make install
 }
 
-build_all "arm64-v8a" "aarch64" "aarch64-linux-android" "aarch64-linux-android"
-build_all "armeabi-v7a" "arm" "arm-linux-androideabi" "armv7a-linux-androideabi"
+# เรียกใช้งานฟังก์ชันให้ถูกต้อง
+build_one "arm64-v8a" "aarch64" "aarch64-linux-android" "aarch64-linux-android"
+build_one "armeabi-v7a" "arm" "arm-linux-androideabi" "armv7a-linux-androideabi"
 
-echo "ALL DONE SUCCESSFULLY!"
+echo "ALL STEPS COMPLETED SUCCESSFULLY!"
