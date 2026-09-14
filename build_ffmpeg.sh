@@ -29,39 +29,36 @@ function build_one {
     echo "--- Building for $ABI ---"
     mkdir -p $OUTPUT_PATH
 
-    # 1. Build LAME (Force Cleaning and Fix Android Linker)
+    # 1. Build LAME (Static - Safer for Android)
     cd $WORKING_DIR/lame-$LAME_VERSION
-    # ล้างตัวอักษร \r (Carriage Return) ออกให้หมด และลบบรรทัดที่มีปัญหา
-    tr -d '\r' < include/libmp3lame.sym > include/libmp3lame.sym.tmp
-    mv include/libmp3lame.sym.tmp include/libmp3lame.sym
-    sed -i '/lame_init_old/d' include/libmp3lame.sym
-    sed -i '/^$/d' include/libmp3lame.sym
+    # ล้างไฟล์สัญลักษณ์เจ้าปัญหาออกให้หมด
+    echo "lame_init" > include/libmp3lame.sym
 
     ./configure \
         --host=$HOST \
         --prefix=$OUTPUT_PATH \
-        --disable-static \
-        --enable-shared \
+        --enable-static \
+        --disable-shared \
         --disable-frontend \
         CC=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
         AR=$TOOLCHAIN/bin/llvm-ar \
         RANLIB=$TOOLCHAIN/bin/llvm-ranlib
     make clean && make -j$(nproc) && make install
 
-    # 2. Build x264
+    # 2. Build x264 (Static)
     cd $WORKING_DIR/x264
     ./configure \
         --host=$HOST \
         --prefix=$OUTPUT_PATH \
-        --bindir=$OUTPUT_PATH/bin \
-        --enable-shared \
+        --enable-static \
+        --disable-shared \
         --disable-cli \
         --cross-prefix=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}- \
         --sysroot=$TOOLCHAIN/sysroot \
         --extra-cflags="-fPIC"
     make clean && make -j$(nproc) && make install
 
-    # 3. Build FFmpeg
+    # 3. Build FFmpeg (Ultimate)
     cd $WORKING_DIR/ffmpeg-$FFMPEG_VERSION
     ./configure \
         --prefix=$OUTPUT_PATH \
@@ -95,7 +92,6 @@ function build_one {
     make clean && make -j$(nproc) && make install
 }
 
-# เรียกใช้งานฟังก์ชันให้ถูกต้อง
 build_one "arm64-v8a" "aarch64" "aarch64-linux-android" "aarch64-linux-android"
 build_one "armeabi-v7a" "arm" "arm-linux-androideabi" "armv7a-linux-androideabi"
 
