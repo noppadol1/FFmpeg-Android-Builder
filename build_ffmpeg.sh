@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e # หยุดทันทีถ้ามีคำสั่งไหนพัง
 
 FFMPEG_VERSION="7.0"
 LAME_VERSION="3.100"
@@ -10,6 +11,7 @@ mkdir -p build && cd build
 WORKING_DIR=$(pwd)
 
 # Download sources
+echo "--- Downloading Sources ---"
 wget -q https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
 wget -q -O lame.tar.gz https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
 git clone --depth 1 https://code.videolan.org/videolan/x264.git
@@ -17,30 +19,32 @@ git clone --depth 1 https://code.videolan.org/videolan/x264.git
 tar xjf ffmpeg-$FFMPEG_VERSION.tar.bz2
 tar xzf lame.tar.gz
 
-function build_one {
+function build_all {
     ABI=$1
     ARCH=$2
-    CROSS_PREFIX=$3
+    HOST=$3
+    CROSS_PREFIX=$4
     OUTPUT_PATH=$WORKING_DIR/output/$ABI
 
-    echo "--- Building $ABI ---"
+    echo "--- Building for $ABI ---"
     mkdir -p $OUTPUT_PATH
 
     # 1. Build LAME
     cd $WORKING_DIR/lame-$LAME_VERSION
     ./configure \
-        --host=$CROSS_PREFIX \
+        --host=$HOST \
         --prefix=$OUTPUT_PATH \
         --disable-static \
         --enable-shared \
         CC=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
-        CFLAGS="-fPIC"
+        AR=$TOOLCHAIN/bin/llvm-ar \
+        RANLIB=$TOOLCHAIN/bin/llvm-ranlib
     make clean && make -j$(nproc) && make install
 
     # 2. Build x264
     cd $WORKING_DIR/x264
     ./configure \
-        --host=$CROSS_PREFIX \
+        --host=$HOST \
         --prefix=$OUTPUT_PATH \
         --enable-shared \
         --disable-cli \
@@ -58,7 +62,7 @@ function build_one {
         --enable-pic \
         --disable-doc \
         --disable-ffmpeg \
-        --cross-prefix=$TOOLCHAIN/bin/$CROSS_PREFIX$API_LEVEL- \
+        --cross-prefix=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}- \
         --target-os=android \
         --arch=$ARCH \
         --enable-cross-compile \
@@ -83,7 +87,7 @@ function build_one {
     make clean && make -j$(nproc) && make install
 }
 
-build_one "arm64-v8a" "aarch64" "aarch64-linux-android"
-build_one "armeabi-v7a" "arm" "armv7a-linux-androideabi"
+build_all "arm64-v8a" "aarch64" "aarch64-linux-android" "aarch64-linux-android"
+build_all "armeabi-v7a" "arm" "arm-linux-androideabi" "armv7a-linux-androideabi"
 
-echo "ALL DONE!"
+echo "ALL STEPS COMPLETED SUCCESSFULLY!"
