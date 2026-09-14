@@ -1,4 +1,4 @@
-name: Build FFmpeg for Android
+name: Build FFmpeg Ultimate for Android
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config yasm wget bzip2
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config yasm wget bzip2 git nasm
 
       - name: Run Build Script
         run: |
@@ -20,6 +20,11 @@ jobs:
           ./build_ffmpeg.sh
 
       - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-ultimate-libs
+          path: build/output/
+
         uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-android-libs-v2
