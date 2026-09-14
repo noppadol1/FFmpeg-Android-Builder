@@ -7,20 +7,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install Tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential yasm wget git nasm
-
-      - name: Run Main Build
-        run: |
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y build-essential yasm wget git nasm
+      - run: |
           chmod +x ./build_ffmpeg.sh
           ./build_ffmpeg.sh
-
-      - name: Upload Artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-ultimate-v4
+          name: ffmpeg-ultimate-v5
           path: build/output/
