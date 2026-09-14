@@ -14,5 +14,5 @@ jobs:
           ./build_ffmpeg.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-ultimate-vfinal
+          name: ffmpeg-ultimate-v6
           path: build/output/
