@@ -1,4 +1,4 @@
-name: Build FFmpeg Ultimate
+name: Build FFmpeg with Android Maker
 
 on:
   workflow_dispatch:
@@ -7,12 +7,31 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y build-essential yasm wget git nasm
-      - run: |
-          chmod +x ./build_ffmpeg.sh
-          ./build_ffmpeg.sh
-      - uses: actions/upload-artifact@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential automake libtool pkg-config yasm wget git nasm python3
+
+      - name: Clone FFmpeg Android Maker
+        run: git clone https://github.com/Javernaut/ffmpeg-android-maker.git
+
+      - name: Build FFmpeg
+        run: |
+          cd ffmpeg-android-maker
+          # สั่งรันโรงงานสำเร็จรูป พร้อมเปิด x264 และ LAME
+          # -a: ระบุ CPU ที่จะทำ
+          # -i: ระบุเวอร์ชัน FFmpeg
+          ./ffmpeg-android-maker.sh \
+            -a "arm64-v8a, armeabi-v7a" \
+            -i "7.0" \
+            --enable-libx264 \
+            --enable-libmp3lame
+            
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-ultimate-v6
-          path: build/output/
+          name: ffmpeg-ultimate-maker
+          path: ffmpeg-android-maker/output/
