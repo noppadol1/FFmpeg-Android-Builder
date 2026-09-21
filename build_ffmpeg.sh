@@ -1,65 +1,24 @@
 #!/bin/bash
-set -e
 
+# 1. ตัวแปรพื้นฐาน
 FFMPEG_VERSION="7.0"
-LAME_VERSION="3.100"
-NDK_PATH=$ANDROID_NDK_LATEST_HOME
+NDK_PATH=$ANDROID_NDK_LATEST_HOME 
 TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
 API_LEVEL=21
 
-mkdir -p build && cd build
-WORKING_DIR=$(pwd)
+# ดาวน์โหลด Source
+wget https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
+tar xjvf ffmpeg-$FFMPEG_VERSION.tar.bz2
+cd ffmpeg-$FFMPEG_VERSION
 
-# Download sources
-echo "--- Downloading Sources ---"
-wget -q https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
-wget -q -O lame.tar.gz https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
-git clone --depth 1 https://code.videolan.org/videolan/x264.git
-
-tar xjf ffmpeg-$FFMPEG_VERSION.tar.bz2
-tar xzf lame.tar.gz
-
-function build_one {
+function build_ffmpeg {
     ABI=$1
     ARCH=$2
-    HOST=$3
-    CROSS_PREFIX=$4
-    OUTPUT_PATH=$WORKING_DIR/output/$ABI
+    CROSS_PREFIX=$3
+    OUTPUT_PATH=$(pwd)/android/$ABI
 
-    echo "--- Building for $ABI ---"
-    mkdir -p $OUTPUT_PATH
+    echo "Building for $ABI..."
 
-    # 1. Build LAME (Static - Safer for Android)
-    cd $WORKING_DIR/lame-$LAME_VERSION
-    # ล้างไฟล์สัญลักษณ์เจ้าปัญหาออกให้หมด
-    echo "lame_init" > include/libmp3lame.sym
-
-    ./configure \
-        --host=$HOST \
-        --prefix=$OUTPUT_PATH \
-        --enable-static \
-        --disable-shared \
-        --disable-frontend \
-        CC=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
-        AR=$TOOLCHAIN/bin/llvm-ar \
-        RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-    make clean && make -j$(nproc) && make install
-
-    # 2. Build x264 (Static)
-    cd $WORKING_DIR/x264
-    ./configure \
-        --host=$HOST \
-        --prefix=$OUTPUT_PATH \
-        --enable-static \
-        --disable-shared \
-        --disable-cli \
-        --cross-prefix=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}- \
-        --sysroot=$TOOLCHAIN/sysroot \
-        --extra-cflags="-fPIC"
-    make clean && make -j$(nproc) && make install
-
-    # 3. Build FFmpeg (Ultimate)
-    cd $WORKING_DIR/ffmpeg-$FFMPEG_VERSION
     ./configure \
         --prefix=$OUTPUT_PATH \
         --enable-shared \
@@ -67,32 +26,43 @@ function build_one {
         --enable-pic \
         --disable-doc \
         --disable-ffmpeg \
-        --cross-prefix=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}- \
+        --disable-ffplay \
+        --disable-ffprobe \
+        --disable-avdevice \
+        --disable-symver \
+        --cross-prefix=$CROSS_PREFIX \
         --target-os=android \
         --arch=$ARCH \
         --enable-cross-compile \
         --sysroot=$TOOLCHAIN/sysroot \
+        --extra-cflags="-Os -fpic" \
         --cc=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
+        --cxx=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang++ \
         --nm=$TOOLCHAIN/bin/llvm-nm \
         --ar=$TOOLCHAIN/bin/llvm-ar \
-        --extra-cflags="-I$OUTPUT_PATH/include" \
-        --extra-ldflags="-L$OUTPUT_PATH/lib" \
-        --enable-gpl \
-        --enable-libmp3lame \
-        --enable-libx264 \
+        --as=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
+        --strip=$TOOLCHAIN/bin/llvm-strip \
+        --ranlib=$TOOLCHAIN/bin/llvm-ranlib \
+        --enable-neon \
+        --enable-hwaccels \
+        --enable-jni \
+        --enable-mediacodec \
         --disable-everything \
-        --enable-decoder=h264,aac,mp3,mpeg4,mjpeg,png \
-        --enable-encoder=aac,mpeg4,libmp3lame,libx264,mjpeg,png \
+        --enable-decoder=h264,aac,mp3,png,mjpeg \
+        --enable-encoder=aac,h264_mediacodec \
         --enable-parser=h264,aac,mpegaudio \
-        --enable-demuxer=mov,mp4,m4a,mp3,wav,avi,matroska,image2,mjpeg,png \
-        --enable-muxer=mp4,mov,mp3,wav,ipod,image2 \
-        --enable-protocol=file \
-        --enable-filter=trim,atrim,amix,volume,aresample,scale,fps,format,anull,aformat
+        --enable-demuxer=mov,mp4,m4a,mp3,image2 \
+        --enable-muxer=mp4,mov,image2 \
+        --enable-protocol=file,pipe \
+        --enable-filter=trim,atrim,amix,volume,aresample,scale,overlay,movie,format,aformat
 
-    make clean && make -j$(nproc) && make install
+    make clean
+    make -j$(nproc)
+    make install
 }
 
-build_one "arm64-v8a" "aarch64" "aarch64-linux-android" "aarch64-linux-android"
-build_one "armeabi-v7a" "arm" "arm-linux-androideabi" "armv7a-linux-androideabi"
+# รันการ Build เฉพาะ 2 สถาปัตยกรรมหลักของ Android
+build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
+build_ffmpeg "armeabi-v7a" "arm" "armv7a-linux-androideabi"
 
-echo "ALL STEPS COMPLETED SUCCESSFULLY!"
+echo "Build Completed!"CCESSFULLY!"
