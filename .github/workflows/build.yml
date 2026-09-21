@@ -1,39 +1,31 @@
-name: Build FFmpeg with Android Maker
+name: Build FFmpeg 7.0 for CutCore
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # เพื่อให้กดรันเองได้จากหน้าเว็บ GitHub
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Tools
+      - name: Set up Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential automake libtool pkg-config yasm wget git nasm python3
+          sudo apt-get install -y build-essential pkg-config yasm nasm wget tar bzip2
 
-      - name: Clone FFmpeg Android Maker
-        run: git clone https://github.com/Javernaut/ffmpeg-android-maker.git
-
-      - name: Build FFmpeg
+      - name: Run FFmpeg Build Script
         run: |
-          cd ffmpeg-android-maker
-          # ระบุตำแหน่ง SDK และ NDK ให้สคริปต์หาเจอ
-          export ANDROID_SDK_HOME=$ANDROID_HOME
-          export ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME
-          
-          ./ffmpeg-android-maker.sh \
-            -a "arm64-v8a, armeabi-v7a" \
-            -i "7.0" \
-            --enable-libx264 \
-            --enable-libmp3lame
-            
-      - name: Upload Results
-        if: success()
+          # ตรวจสอบว่าไฟล์ build_ffmpeg.sh อยู่ที่ root หรือไม่
+          chmod +x ./build_ffmpeg.sh
+          ./build_ffmpeg.sh
+
+      - name: Upload Native Libraries
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-ultimate-maker
-          path: ffmpeg-android-maker/output/
+          name: ffmpeg-7.0-android-libs
+          # ชี้ไปที่โฟลเดอร์ผลลัพธ์ที่สคริปต์สร้างขึ้น
+          path: ffmpeg-7.0/android/
+          if-no-files-found: error
