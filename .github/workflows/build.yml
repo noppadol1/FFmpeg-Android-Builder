@@ -1,76 +1,42 @@
-name: Build FFmpeg for Android ARM64
+# กำหนด path ไปยัง NDK ของคุณ (ตัวอย่างเช่น NDK ที่อยู่ใน Android Studio บน Linux/WSL)
+export NDK=$HOME/Android/Sdk/ndk/27.3.13750724
+export TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+export TARGET=aarch64-linux-android
+export API=24
 
-on:
-  workflow_dispatch:
+export CC=$TOOLCHAIN/bin/aarch64-linux-android$API-clang
+export CXX=$TOOLCHAIN/bin/aarch64-linux-android$API-clang++
+export AR=$TOOLCHAIN/bin/llvm-ar
+export AS=$TOOLCHAIN/bin/llvm-as
+export LD=$TOOLCHAIN/bin/ld.lld
+export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+export STRIP=$TOOLCHAIN/bin/llvm-strip
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-
-    - name: Setup Environment & Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential yasm nasm pkg-config git wget make
-
-    - name: Download FFmpeg Source Code
-      run: |
-        git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git ffmpeg-src
-
-    - name: Configure and Build FFmpeg for ARM64
-      run: |
-        cd ffmpeg-src
-        
-        echo "NDK Home: $ANDROID_NDK_HOME"
-        ls -l $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/
-        
-        export NDK=$ANDROID_NDK_HOME
-        export TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
-        export TARGET=aarch64-linux-android
-        export API=24
-        
-        export CC=$TOOLCHAIN/bin/aarch64-linux-android$API-clang
-        export CXX=$TOOLCHAIN/bin/aarch64-linux-android$API-clang++
-        export AR=$TOOLCHAIN/bin/llvm-ar
-        export AS=$TOOLCHAIN/bin/llvm-as
-        export LD=$TOOLCHAIN/bin/ld.lld
-        export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
-        export STRIP=$TOOLCHAIN/bin/llvm-strip
-
-        ./configure \
-            --target-os=linux \
-            --arch=aarch64 \
-            --enable-cross-compile \
-            --cc="$CC" \
-            --cxx="$CXX" \
-            --ar="$AR" \
-            --as="$AS" \
-            --ld="$LD" \
-            --ranlib="$RANLIB" \
-            --strip="$STRIP" \
-            --disable-shared \
-            --enable-static \
-            --disable-doc \
-            --disable-ffplay \
-            --disable-ffprobe \
-            --disable-avdevice \
-            --disable-swscale-alpha \
-            --disable-network \
-            --disable-everything \
-            --enable-decoder=h264,hevc,av1,vp9,aac,opus,vorbis,flac,mp3 \
-            --enable-encoder=aac,libopus \
-            --enable-demuxer=matroska,mov,ogg,mp3,flv \
-            --enable-muxer=matroska,mov,mp4,ogg,mp3 \
-            --enable-parser=h264,hevc,av1,vp9,aac,opus,mpegaudio \
-            --enable-protocol=file,pipe || (cat ffbuild/config.log && exit 1)
-
-        make -j$(nproc)
-        
-    - name: Upload FFmpeg Binary Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ffmpeg-android-arm64
-        path: ffmpeg-src/ffmpeg
+# รัน Configure ตัดฟีเจอร์ขยะออกให้หมดเหลือแต่ตัวจิ๋ว
+./configure \
+    --target-os=linux \
+    --arch=aarch64 \
+    --enable-cross-compile \
+    --cc="$CC" \
+    --cxx="$CXX" \
+    --ar="$AR" \
+    --as="$AS" \
+    --ld="$LD" \
+    --ranlib="$RANLIB" \
+    --strip="$STRIP" \
+    --disable-shared \
+    --enable-static \
+    --disable-doc \
+    --disable-ffplay \
+    --disable-ffprobe \
+    --disable-avdevice \
+    --disable-swscale-alpha \
+    --disable-network \
+    --disable-asm \
+    --disable-everything \
+    --enable-decoder=h264,hevc,av1,vp9,aac,opus,vorbis,flac,mp3 \
+    --enable-encoder=aac,libopus \
+    --enable-demuxer=matroska,mov,ogg,mp3,flv \
+    --enable-muxer=matroska,mov,mp4,ogg,mp3 \
+    --enable-parser=h264,hevc,av1,vp9,aac,opus,mpegaudio \
+    --enable-protocol=file,pipe
