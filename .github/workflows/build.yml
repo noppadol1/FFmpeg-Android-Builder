@@ -1,78 +1,29 @@
-#!/bin/bash
+name: Build FFmpeg 7.0 for CutCore
 
-# 1. ตัวแปรพื้นฐาน
-FFMPEG_VERSION="7.0"
-NDK_PATH=$ANDROID_NDK_LATEST_HOME
-TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
-API_LEVEL=21
+on:
+  workflow_dispatch: # เพื่อให้กดรันเองได้จากหน้าเว็บ GitHub Actions
 
-# ดาวน์โหลด Source (เปิดใช้งานหากยังไม่มีไฟล์)
-if [ ! -f "ffmpeg-$FFMPEG_VERSION.tar.bz2" ]; then
-    wget https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
-fi
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-if [ ! -d "ffmpeg-$FFMPEG_VERSION" ]; then
-    tar xjvf ffmpeg-$FFMPEG_VERSION.tar.bz2
-fi
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-cd ffmpeg-$FFMPEG_VERSION
+      - name: Set up Build Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config yasm nasm wget tar bzip2
 
-function build_ffmpeg {
-    ABI=$1
-    ARCH=$2
-    CROSS_PREFIX=$3
-    OUTPUT_PATH=$(pwd)/android/$ABI
+      - name: Run FFmpeg Build Script
+        run: |
+          chmod +x ./build_ffmpeg.sh
+          ./build_ffmpeg.sh
 
-    echo "=========================================="
-    echo "Building FFmpeg for $ABI ($ARCH)..."
-    echo "=========================================="
-
-    ./configure \
-        --prefix=$OUTPUT_PATH \
-        --enable-shared \
-        --disable-static \
-        --enable-pic \
-        --disable-doc \
-        --disable-ffmpeg \
-        --disable-ffplay \
-        --disable-ffprobe \
-        --disable-avdevice \
-        --disable-symver \
-        --cross-prefix=$CROSS_PREFIX \
-        --target-os=android \
-        --arch=$ARCH \
-        --enable-cross-compile \
-        --sysroot=$TOOLCHAIN/sysroot \
-        --extra-cflags="-Os -fpic" \
-        --cc=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
-        --cxx=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang++ \
-        --nm=$TOOLCHAIN/bin/llvm-nm \
-        --ar=$TOOLCHAIN/bin/llvm-ar \
-        --as=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
-        --strip=$TOOLCHAIN/bin/llvm-strip \
-        --ranlib=$TOOLCHAIN/bin/llvm-ranlib \
-        --enable-neon \
-        --enable-hwaccels \
-        --enable-jni \
-        --enable-mediacodec \
-        --disable-everything \
-        --enable-decoder=h264,hevc,av1,vp9,aac,mp3,png,mjpeg,flac,opus,vorbis \
-        --enable-encoder=aac,h264_mediacodec,libopus \
-        --enable-parser=h264,hevc,av1,vp9,aac,mpegaudio,opus \
-        --enable-demuxer=concat,mov,mp4,m4a,mp3,image2,flv,matroska,ogg \
-        --enable-muxer=mp4,mov,image2,mp3,matroska,ogg \
-        --enable-protocol=file,pipe \
-        --enable-filter=concat,trim,atrim,amix,volume,aresample,scale,overlay,movie,format,aformat,pad,crop
-
-    make clean
-    make -j$(nproc)
-    make install
-}
-
-# รันการ Build เฉพาะ 2 สถาปัตยกรรมหลักของ Android (arm64-v8a และ armeabi-v7a)
-build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
-build_ffmpeg "armeabi-v7a" "arm" "armv7a-linux-androideabi"
-
-echo "=========================================="
-echo "🎉 FFmpeg Build Completed Successfully!"
-echo "=========================================="
+      - name: Upload Native Libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-7.0-android-libs
+          path: ffmpeg-7.0/android/
+          if-no-files-found: error
