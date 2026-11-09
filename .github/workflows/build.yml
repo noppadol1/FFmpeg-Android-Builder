@@ -1,7 +1,7 @@
 name: Build FFmpeg 7.0 for CutCore
 
 on:
-  workflow_dispatch: # เพื่อให้กดรันเองได้จากหน้าเว็บ GitHub Actions
+  workflow_dispatch:
 
 jobs:
   build:
