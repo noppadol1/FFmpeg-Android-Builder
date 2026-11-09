@@ -1,23 +1,30 @@
 #!/bin/bash
 
-# 1. ตั้งค่าพื้นฐาน
+# 1. ตัวแปรพื้นฐาน
 FFMPEG_VERSION="7.0"
-NDK_PATH=$ANDROID_NDK_LATEST_HOME 
+NDK_PATH=$ANDROID_NDK_LATEST_HOME
 TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
 API_LEVEL=21
 
-# ดาวน์โหลด FFmpeg
-wget https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
-tar xjvf ffmpeg-$FFMPEG_VERSION.tar.bz2
+if [ ! -f "ffmpeg-$FFMPEG_VERSION.tar.bz2" ]; then
+    wget https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2
+fi
+
+if [ ! -d "ffmpeg-$FFMPEG_VERSION" ]; then
+    tar xjvf ffmpeg-$FFMPEG_VERSION.tar.bz2
+fi
+
 cd ffmpeg-$FFMPEG_VERSION
 
 function build_ffmpeg {
     ABI=$1
     ARCH=$2
-    CC_PREFIX=$3
+    CROSS_PREFIX=$3
     OUTPUT_PATH=$(pwd)/android/$ABI
 
-    echo "Building for $ABI..."
+    echo "=========================================="
+    echo "Building FFmpeg for $ABI ($ARCH)..."
+    echo "=========================================="
 
     ./configure \
         --prefix=$OUTPUT_PATH \
@@ -30,17 +37,17 @@ function build_ffmpeg {
         --disable-ffprobe \
         --disable-avdevice \
         --disable-symver \
-        --cross-prefix=${CC_PREFIX}- \
+        --cross-prefix=$CROSS_PREFIX \
         --target-os=android \
         --arch=$ARCH \
         --enable-cross-compile \
         --sysroot=$TOOLCHAIN/sysroot \
         --extra-cflags="-Os -fpic" \
-        --cc=$TOOLCHAIN/bin/${CC_PREFIX}${API_LEVEL}-clang \
-        --cxx=$TOOLCHAIN/bin/${CC_PREFIX}${API_LEVEL}-clang++ \
+        --cc=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
+        --cxx=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang++ \
         --nm=$TOOLCHAIN/bin/llvm-nm \
         --ar=$TOOLCHAIN/bin/llvm-ar \
-        --as=$TOOLCHAIN/bin/${CC_PREFIX}${API_LEVEL}-clang \
+        --as=$TOOLCHAIN/bin/${CROSS_PREFIX}${API_LEVEL}-clang \
         --strip=$TOOLCHAIN/bin/llvm-strip \
         --ranlib=$TOOLCHAIN/bin/llvm-ranlib \
         --enable-neon \
@@ -48,21 +55,22 @@ function build_ffmpeg {
         --enable-jni \
         --enable-mediacodec \
         --disable-everything \
-        --enable-decoder=h264,aac,mp3,png,mjpeg \
-        --enable-encoder=aac,h264_mediacodec,mpeg4 \
-        --enable-parser=h264,aac,mpegaudio \
-        --enable-demuxer=mov,mp4,m4a,mp3,image2 \
-        --enable-muxer=mp4,mov,image2 \
+        --enable-decoder=h264,hevc,av1,vp9,aac,mp3,png,mjpeg,flac,opus,vorbis \
+        --enable-encoder=aac,h264_mediacodec,libopus \
+        --enable-parser=h264,hevc,av1,vp9,aac,mpegaudio,opus \
+        --enable-demuxer=concat,mov,mp4,m4a,mp3,image2,flv,matroska,ogg \
+        --enable-muxer=mp4,mov,image2,mp3,matroska,ogg \
         --enable-protocol=file,pipe \
-        --enable-filter=trim,atrim,amix,volume,aresample,scale,overlay,movie,format,aformat
+        --enable-filter=concat,trim,atrim,amix,volume,aresample,scale,overlay,movie,format,aformat,pad,crop
 
     make clean
     make -j$(nproc)
     make install
 }
 
-# รันการ Build สำหรับ 2 สถาปัตยกรรมหลัก
 build_ffmpeg "arm64-v8a" "aarch64" "aarch64-linux-android"
 build_ffmpeg "armeabi-v7a" "arm" "armv7a-linux-androideabi"
 
-echo "Build Completed!"
+echo "=========================================="
+echo "🎉 FFmpeg Build Completed Successfully!"
+echo "=========================================="
